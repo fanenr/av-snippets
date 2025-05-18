@@ -3,7 +3,7 @@
 #define INPUT_FORMAT "alsa"
 #define DEVICE_NAME "default"
 
-char err_buff[AV_ERROR_MAX_STRING_SIZE];
+char errbuf[AV_ERROR_MAX_STRING_SIZE];
 
 int
 main (int argc, char **argv)
@@ -25,8 +25,8 @@ main (int argc, char **argv)
   ret = avformat_open_input (&fmt_ctx, DEVICE_NAME, in_fmt, NULL);
   if (ret < 0)
     {
-      av_strerror (ret, err_buff, sizeof (err_buff));
-      fprintf (stderr, "Could not open audio device: %s.\n", err_buff);
+      av_strerror (ret, errbuf, sizeof (errbuf));
+      fprintf (stderr, "Could not open audio device: %s.\n", errbuf);
       return 1;
     }
   printf ("Successfully opened audio device.\n");
@@ -36,8 +36,8 @@ main (int argc, char **argv)
   ret = avformat_find_stream_info (fmt_ctx, NULL);
   if (ret < 0)
     {
-      av_strerror (ret, err_buff, sizeof (err_buff));
-      fprintf (stderr, "Failed to find stream information: %s.\n", err_buff);
+      av_strerror (ret, errbuf, sizeof (errbuf));
+      fprintf (stderr, "Failed to find stream information: %s.\n", errbuf);
     }
 
   for (unsigned i = 0; i < fmt_ctx->nb_streams; i++)
