@@ -1,0 +1,5 @@
+*.o
+*.pcm
+a.out
+
+.clangd
