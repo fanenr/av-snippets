@@ -1,5 +1,5 @@
 #include "ui_main.h"
-#include <QThread>
+#include <thread>
 
 extern "C"
 {
@@ -9,14 +9,16 @@ extern "C"
 class audio_recorder
 {
 public:
-  audio_recorder (const char *in_fmt, const char *dev_name)
+  audio_recorder (const char *fmt_name, const char *dev_name)
   {
-    m_in_fmt = av_find_input_format (in_fmt);
+    m_in_fmt = av_find_input_format (fmt_name);
     if (m_in_fmt == nullptr)
       throw std::runtime_error ("Could not find input format.");
 
     if (avformat_open_input (&m_fmt_ctx, dev_name, m_in_fmt, nullptr) != 0)
       throw std::runtime_error ("Could not open audio device.");
+
+    m_pkt = av_packet_alloc ();
   }
 
   ~audio_recorder ()
@@ -30,11 +32,7 @@ public:
   const AVPacket *
   read_frame ()
   {
-    if (m_pkt != nullptr)
-      av_packet_unref (m_pkt);
-    else
-      m_pkt = av_packet_alloc ();
-
+    av_packet_unref (m_pkt);
     if (av_read_frame (m_fmt_ctx, m_pkt) != 0)
       return nullptr;
     return m_pkt;
@@ -64,20 +62,21 @@ main (int argc, char **argv)
   audio_recorder::init ();
 
   std::thread worker;
-  FILE *out = nullptr;
   std::atomic<bool> recording = false;
-  auto recorder = audio_recorder ("alsa", "default");
 
   auto record = [&] () {
-    for (;;)
-      {
-	if (!recording)
-	  break;
+    auto out = fopen ("out.pcm", "wb");
+    if (out == nullptr)
+      throw std::runtime_error ("Could not create pcm file.");
 
+    for (auto recorder = audio_recorder ("alsa", "default"); recording;)
+      {
 	auto pkt = recorder.read_frame ();
 	if (pkt != nullptr)
 	  fwrite (pkt->data, 1, pkt->size, out);
       }
+
+    fclose (out);
   };
 
   QObject::connect (ui.btn, &QPushButton::clicked, [&] () {
@@ -87,18 +86,11 @@ main (int argc, char **argv)
     if (!recording)
       {
 	worker.join ();
-	fclose (out);
-	out = nullptr;
-
 	ui.btn->setText ("start");
 	return;
       }
 
     // 开始录制
-    out = fopen ("out.pcm", "wb");
-    if (out == nullptr)
-      throw std::runtime_error ("Could not create pcm file.");
-
     worker = std::thread (record);
     ui.btn->setText ("stop");
   });
@@ -107,8 +99,6 @@ main (int argc, char **argv)
     recording = false;
     if (worker.joinable ())
       worker.join ();
-    if (out != nullptr)
-      fclose (out);
   });
 
   window.show ();
